@@ -263,7 +263,7 @@ Total Budget: $${totalBudget.toLocaleString()}
 Number of Programs: ${programs.length}
 
 I need you to allocate the total budget of $${totalBudget.toLocaleString()} across the following programs for the ${department}.
-Each program should be assigned a portion of the budget based on the program's description, complexity, and likely resource needs.
+Each program should be assigned a portion of the budget based on the program's description, complexity, and likely resource needs. All programs should have a cost greater than zero.
 
 Here are the programs:
 
