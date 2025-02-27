@@ -21,25 +21,37 @@ function chunkArray(array, chunkSize) {
   return chunks;
 }
 
-// Function to add slight variations to equal budget distribution
+// Enhanced function to add meaningful variations to budget distribution
 function distributeWithVariation(programs, totalBudget) {
   const baseAllocation = totalBudget / programs.length;
   
-  // Create a deterministic seed based on program names
-  const getSeed = (programName) => {
+  // Create a more complex seed generation
+  const getSeed = (programName, index) => {
     let hash = 0;
     for (let i = 0; i < programName.length; i++) {
       const char = programName.charCodeAt(i);
       hash = ((hash << 5) - hash) + char;
       hash = hash & hash; // Convert to 32-bit integer
     }
-    return Math.abs(hash);
+    // Incorporate the index to create more unique variations
+    return Math.abs(hash + index * 1237);
   };
 
-  // Use a variation factor that ensures we don't stray too far from equal distribution
-  return programs.map((program, index) => {
-    const seed = getSeed(program.Program);
-    const variationFactor = 1 + (seed % 100 - 50) / 1000; // +/- 5% variation
+  // Sort programs to ensure consistent ordering
+  const sortedPrograms = [...programs].sort((a, b) => a.Program.localeCompare(b.Program));
+
+  // Calculate allocations with more nuanced variations
+  const allocatedPrograms = sortedPrograms.map((program, index) => {
+    const seed = getSeed(program.Program, index);
+    
+    // Use a more sophisticated variation approach
+    // Variation now depends on program index and a unique seed
+    const variationFactor = 1 + (
+      (seed % 200 - 100) / 1000 +  // Base random variation
+      (index * 0.005) -             // Slight progressive bias
+      (Math.sin(seed) * 0.02)       // Additional pseudo-random factor
+    );
+
     const allocatedAmount = baseAllocation * variationFactor;
     
     return {
@@ -49,6 +61,24 @@ function distributeWithVariation(programs, totalBudget) {
       "Total Cost": Math.round(allocatedAmount * 100) / 100
     };
   });
+
+  // Ensure total budget is exactly maintained
+  const currentTotal = allocatedPrograms.reduce((sum, p) => sum + p["Total Cost"], 0);
+  const scalingFactor = totalBudget / currentTotal;
+
+  allocatedPrograms.forEach(program => {
+    program["Total Cost"] = Math.round(program["Total Cost"] * scalingFactor * 100) / 100;
+  });
+
+  // Final adjustment to ensure exact total
+  const finalTotal = allocatedPrograms.reduce((sum, p) => sum + p["Total Cost"], 0);
+  const difference = totalBudget - finalTotal;
+  
+  if (allocatedPrograms.length > 0) {
+    allocatedPrograms[allocatedPrograms.length - 1]["Total Cost"] += difference;
+  }
+
+  return allocatedPrograms;
 }
 
 // Set up middleware
