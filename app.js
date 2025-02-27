@@ -25,16 +25,19 @@ function chunkArray(array, chunkSize) {
 function distributeWithVariation(programs, totalBudget) {
   const baseAllocation = totalBudget / programs.length;
   
-  // Create a more complex seed generation
-  const getSeed = (programName, index) => {
+  // Create a more complex seed generation with multiple entropy sources
+  const getSeed = (programName, index, totalPrograms) => {
     let hash = 0;
-    for (let i = 0; i < programName.length; i++) {
-      const char = programName.charCodeAt(i);
+    // Use program name, index, and total number of programs for entropy
+    const seedString = `${programName}-${index}-${totalPrograms}`;
+    
+    for (let i = 0; i < seedString.length; i++) {
+      const char = seedString.charCodeAt(i);
       hash = ((hash << 5) - hash) + char;
       hash = hash & hash; // Convert to 32-bit integer
     }
-    // Incorporate the index to create more unique variations
-    return Math.abs(hash + index * 1237);
+    
+    return Math.abs(hash);
   };
 
   // Sort programs to ensure consistent ordering
@@ -42,16 +45,25 @@ function distributeWithVariation(programs, totalBudget) {
 
   // Calculate allocations with more nuanced variations
   const allocatedPrograms = sortedPrograms.map((program, index) => {
-    const seed = getSeed(program.Program, index);
-    
-    // Use a more sophisticated variation approach
-    // Variation now depends on program index and a unique seed
-    const variationFactor = 1 + (
-      (seed % 200 - 100) / 1000 +  // Base random variation
-      (index * 0.005) -             // Slight progressive bias
-      (Math.sin(seed) * 0.02)       // Additional pseudo-random factor
+    // Use multiple sources of entropy
+    const seed = getSeed(
+      program.Program, 
+      index, 
+      sortedPrograms.length
     );
-
+    
+    // More sophisticated variation approach
+    const variationFactors = [
+      (seed % 200 - 100) / 500,            // Base random variation
+      Math.sin(seed) * 0.03,               // Trigonometric variation
+      (index * 0.01) - (sortedPrograms.length / 200),  // Index-based progressive bias
+      Math.cos(index) * 0.02               // Additional cyclic variation
+    ];
+    
+    // Combine variation factors
+    const totalVariation = variationFactors.reduce((a, b) => a + b, 0);
+    
+    const variationFactor = 1 + totalVariation;
     const allocatedAmount = baseAllocation * variationFactor;
     
     return {
