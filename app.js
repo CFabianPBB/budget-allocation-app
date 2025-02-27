@@ -181,9 +181,9 @@ async function allocateBudgetChunk(department, programs, totalBudget) {
     // Summarize descriptions to reduce token count
     const summarizedPrograms = programs.map(program => {
       // Take only first 100 characters of each description to reduce token count
-      const shortenedDesc = program.Description.length > 100 ? 
+      const shortenedDesc = program.Description && program.Description.length > 100 ? 
         program.Description.substring(0, 100) + "..." : 
-        program.Description;
+        program.Description || "No description provided";
       
       return {
         ...program,
@@ -211,8 +211,35 @@ async function allocateBudgetChunk(department, programs, totalBudget) {
       max_tokens: 2000  // Reduced from 4000
     });
     
-    // Parse the response
-    const allocation = JSON.parse(response.choices[0].message.content);
+    // Parse the response with robust error handling
+    let allocation;
+    try {
+      allocation = JSON.parse(response.choices[0].message.content);
+    } catch (parseError) {
+      console.error('Error parsing OpenAI response:', parseError);
+      console.log('Response content:', response.choices[0].message.content);
+      
+      // Create a fallback allocation with equal distribution
+      allocation = {
+        program_allocations: programs.map(p => ({
+          program_name: p.Program,
+          allocation: totalBudget / programs.length
+        })),
+        allocation_strategy: "Equal distribution fallback due to parsing error"
+      };
+    }
+
+    // Validate the allocation structure
+    if (!allocation || !Array.isArray(allocation.program_allocations)) {
+      console.log('Invalid allocation structure, falling back to equal distribution');
+      allocation = {
+        program_allocations: programs.map(p => ({
+          program_name: p.Program,
+          allocation: totalBudget / programs.length
+        })),
+        allocation_strategy: "Equal distribution fallback due to invalid structure"
+      };
+    }
     
     // Map the allocations back to the original program data with full descriptions
     const allocatedPrograms = programs.map(program => {
@@ -224,7 +251,7 @@ async function allocateBudgetChunk(department, programs, totalBudget) {
         Department: program.Department,
         Program: program.Program,
         Description: program.Description,  // Use original full description
-        "Total Cost": programAllocation ? programAllocation.allocation : 0
+        "Total Cost": programAllocation ? programAllocation.allocation : (totalBudget / programs.length)
       };
     });
     
@@ -247,7 +274,16 @@ async function allocateBudgetChunk(department, programs, totalBudget) {
     return allocatedPrograms;
   } catch (error) {
     console.error(`Error processing chunk for ${department}:`, error);
-    throw error;
+    
+    // Fallback to equal distribution if everything else fails
+    const equalAllocation = programs.map(program => ({
+      Department: program.Department,
+      Program: program.Program,
+      Description: program.Description,
+      "Total Cost": totalBudget / programs.length
+    }));
+    
+    return equalAllocation;
   }
 }
 
